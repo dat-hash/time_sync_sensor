@@ -62,30 +62,31 @@ static void print_status(void)
         printf("[STATUS] tim2 %lu.%09lu s | gnss bytes %lu errors %lu\r\n", (unsigned long)seconds, (unsigned long)nanoseconds,
                 (unsigned long)gnss_uart_get_total_bytes_received(), (unsigned long)gnss_uart_get_error_count());
         
-
         // pps report
         pps_status_t pps_status;
         pps_capture_status(&pps_status);
 
         if (pps_status.last_interval_is_valid) {
-            int32_t error_ppb = pps_status.last_clock_error_ppb;
+            int32_t clock_error = pps_status.last_clock_error;
+            int64_t total_clock_error = pps_status.total_clock_error;
 
-            if (error_ppb < 0) {
-                uint32_t error_magnitude = (uint32_t)(-error_ppb);   /* make it positive first */
-                printf("[pps] interval %lu ticks | clock -%lu.%03lu ppm | good %lu bad %lu lost %lu\r\n",
-                        (unsigned long)pps_status.last_interval_ticks, (unsigned long)(error_magnitude / 1000u),
-                        (unsigned long)(error_magnitude % 1000u), (unsigned long)pps_status.good_interval_count,
-                        (unsigned long)pps_status.bad_interval_count, (unsigned long)pps_status.lost_pulse_count);
-            }
-            else {
-                printf("[pps] interval %lu ticks | clock +%lu.%03lu ppm | good %lu bad %lu lost %lu\r\n",
-                        (unsigned long)pps_status.last_interval_ticks, (unsigned long)((uint32_t)error_ppb / 1000u),
-                        (unsigned long)((uint32_t)error_ppb % 1000u), (unsigned long)pps_status.good_interval_count,
-                        (unsigned long)pps_status.bad_interval_count, (unsigned long)pps_status.lost_pulse_count);
-            }
+            char clock_error_sign = (clock_error < 0) ? '-':'+';
+            char total_clock_error_sign = (total_clock_error < 0) ? '-':'+';
+
+            uint32_t error_magnitude = (clock_error < 0) ? (uint32_t)(-clock_error) : (uint32_t)(clock_error);
+            uint32_t total_error_magnitude = (total_clock_error < 0) ? (uint32_t)(-total_clock_error) : (uint32_t)(total_clock_error);
+
+            printf("[pps] interval %lu ticks | clock error %c%lu ticks | Total clock drift %c%lu ticks | good %lu bad %lu lost %lu\r\n",
+                    (unsigned long)pps_status.last_interval_ticks, clock_error_sign, (unsigned long)error_magnitude, 
+                    total_clock_error_sign, (unsigned long)total_error_magnitude,(unsigned long)pps_status.good_interval_count, 
+                    (unsigned long)pps_status.bad_interval_count, (unsigned long)pps_status.lost_pulse_count);
+    
         }
         else {
-            printf("[pps] waiting for pulses (seen %lu)\r\n", (unsigned long)pps_status.pulse_count); // idealy this should not happen alot
+            printf("[pps] no valid interval yet | seen %lu good %lu bad %lu lost %lu | last interval %lu ticks\r\n",
+                    (unsigned long)pps_status.pulse_count, (unsigned long)pps_status.good_interval_count,
+                    (unsigned long)pps_status.bad_interval_count, (unsigned long)pps_status.lost_pulse_count,
+                    (unsigned long)pps_status.last_raw_interval_ticks);
         }
     }
 }
@@ -99,7 +100,7 @@ void app_loop(void)
     static uint8_t gnss_new_bytes[256];
     uint32_t new_byte_count = gnss_uart_read_new_bytes(gnss_new_bytes, sizeof(gnss_new_bytes));
     if (new_byte_count > 0u) {
-        fwrite(gnss_new_bytes, 1, new_byte_count, stdout);
+        // fwrite(gnss_new_bytes, 1, new_byte_count, stdout);
     }
     debug_gnss_total_bytes = gnss_uart_get_total_bytes_received();
     debug_gnss_errors = gnss_uart_get_error_count();

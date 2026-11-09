@@ -1,9 +1,10 @@
 #include "pps_capture.h"
 #include "timebase.h"
 #include "tim.h" 
+#include <stdint.h>
 
 #define PULSE_QUEUE_LENGTH 8u
-#define MAXIMUM_INTERVAL_DEVIATION_TICKS 40000
+#define MAXIMUM_INTERVAL_DEVIATION_TICKS 3000000
 
 static volatile uint64_t pulse_queue[PULSE_QUEUE_LENGTH];
 static volatile uint32_t pulse_queue_write_index = 0u;
@@ -19,12 +20,15 @@ static uint32_t good_interval_count = 0u;
 static uint32_t bad_interval_count = 0u;
 static bool last_interval_is_valid = false;
 static uint32_t last_interval_ticks = 0u;
-static int32_t last_clock_error_ppb = 0;
+static int32_t last_clock_error= 0;
+static int64_t total_clock_error = 0;
 static uint64_t last_pulse_tick = 0u;
+static uint32_t last_raw_interval_ticks = 0u;
+
 
 // init
 bool pps_capture_start(void){
-        if ((HAL_TIM_IC_Start_IT(&htim2,HAL_TIM_ACTIVE_CHANNEL_3)) != HAL_OK) {
+        if ((HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_3)) != HAL_OK) {
         return false;
     }
     else {
@@ -74,12 +78,14 @@ static void measure_interval(uint64_t pulse_tick)
 {
     if (previous_pulse_is_available) {
         uint64_t interval_ticks = pulse_tick - previous_pulse_tick;
+        last_raw_interval_ticks = (uint32_t)interval_ticks;
         int64_t deviation_ticks = (int64_t)interval_ticks - (int64_t)TIMEBASE_NOMINAL_TICKS_PER_SECOND;
 
         // inbound check
         if (deviation_ticks <= MAXIMUM_INTERVAL_DEVIATION_TICKS && deviation_ticks >= -MAXIMUM_INTERVAL_DEVIATION_TICKS) {
 
-            last_clock_error_ppb = (int32_t)(deviation_ticks * 5); // for debug and clock performance measurement
+            last_clock_error = deviation_ticks; // for debug and clock performance measurement
+            total_clock_error = total_clock_error + deviation_ticks;
             last_interval_ticks = (uint32_t)interval_ticks;
             last_interval_is_valid = true;
             good_interval_count = good_interval_count + 1u;
@@ -110,8 +116,10 @@ void pps_capture_status(pps_status_t *status)
     status->lost_pulse_count = lost_pulse_count;
     status->last_interval_is_valid = last_interval_is_valid;
     status->last_interval_ticks = last_interval_ticks;
-    status->last_clock_error_ppb = last_clock_error_ppb;
+    status->last_clock_error = last_clock_error;
     status->last_pulse_tick = last_pulse_tick;
+    status->last_raw_interval_ticks = last_raw_interval_ticks;
+    status->total_clock_error = total_clock_error;
 }
 
 

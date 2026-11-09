@@ -12,8 +12,10 @@ typedef struct
     uint32_t lost_pulse_count; // main too slow, miss
     bool last_interval_is_valid;
     uint32_t last_interval_ticks;
-    int32_t last_clock_error_ppb; // how off is our internal clock
+    int32_t last_clock_error; // how off is our internal clock
     uint64_t last_pulse_tick; // latest 64bit stamp
+    uint32_t last_raw_interval_ticks;
+    int64_t total_clock_error;
 } pps_status_t;
 
 bool pps_capture_start(void);
