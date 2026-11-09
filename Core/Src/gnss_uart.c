@@ -1,7 +1,7 @@
 #include "gnss_uart.h"
 #include "dma_buffer.h"
 #include "usart.h"
-#include "timebase.h"
+
 
 #define GNSS_RECEIVE_BUFFER_LENGTH 2048u
 
@@ -115,15 +115,6 @@ uint32_t gnss_uart_read_new_bytes(uint8_t *destination, uint32_t maximum_bytes)
     main_loop_read_position = read_position;
     total_bytes_received = total_bytes_received + bytes_copied;
     return bytes_copied;
-}
-
-uint64_t gnss_uart_get_latest_receive_tick(void)
-{
-    uint32_t saved_interrupt_mask = __get_PRIMASK();
-    __disable_irq();
-    uint64_t tick = latest_receive_tick;
-    __set_PRIMASK(saved_interrupt_mask);
-    return tick;
 }
 
 // baud finder
